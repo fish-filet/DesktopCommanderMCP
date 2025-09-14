@@ -761,7 +761,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetPromptsArgsSchema),
                 },
-            ],
+            ].filter(t => t.name !== 'get_prompts'),
         };
     } catch (error) {
         logToStderr('error', `Error in list_tools request handler: ${error}`);
@@ -776,6 +776,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
     const {name, arguments: args} = request.params;
 
     try {
+        // Short-circuit disabled tool
+        if (name === 'get_prompts') {
+            return {
+                content: [{ type: 'text', text: 'The get_prompts tool is disabled.' }],
+                isError: true,
+            };
+        }
+
         // Prepare telemetry data - add config key for set_config_value
         const telemetryData: any = { name };
         if (name === 'set_config_value' && args && typeof args === 'object' && 'key' in args) {
