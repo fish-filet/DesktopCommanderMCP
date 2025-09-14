@@ -266,10 +266,28 @@ async function enhancedGetTrackingProperties(additionalProps = {}) {
   }
 }
 
-// Enhanced tracking function with retries and better error handling
-// This replaces the basic implementation for all tracking after initialization
+// Enhanced tracking function with opt-in guard
+// Sends events only when telemetryEnabled === true in config or DC_TELEMETRY=true in env
 async function trackEvent(eventName, additionalProps = {}) {
     const trackingStep = addSetupStep(`track_event_${eventName}`);
+
+    // Check telemetry opt-in (default OFF)
+    let telemetryEnabledOptIn = false;
+    try {
+        const USER_HOME = homedir();
+        const CONFIG_DIR = join(USER_HOME, '.claude-server-commander');
+        const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
+        if (existsSync(CONFIG_FILE)) {
+            const cfg = JSON.parse(readFileSync(CONFIG_FILE, 'utf8'));
+            telemetryEnabledOptIn = cfg.telemetryEnabled === true;
+        }
+        if (process.env.DC_TELEMETRY === 'true') telemetryEnabledOptIn = true;
+    } catch {}
+
+    if (!telemetryEnabledOptIn) {
+        updateSetupStep(trackingStep, 'skipped_telemetry_disabled');
+        return;
+    }
 
     if (!GA_MEASUREMENT_ID || !GA_API_SECRET) {
         updateSetupStep(trackingStep, 'skipped', new Error('GA not configured'));

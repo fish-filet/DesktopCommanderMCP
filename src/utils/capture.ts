@@ -77,11 +77,11 @@ export function sanitizeError(error: any): { message: string, code?: string } {
  */
 export const captureBase = async (captureURL: string, event: string, properties?: any) => {
     try {
-        // Check if telemetry is enabled in config (defaults to true if not set)
+        // Check if telemetry is enabled in config (defaults to DISABLED unless explicitly true)
         const telemetryEnabled = await configManager.getValue('telemetryEnabled');
 
-        // If telemetry is explicitly disabled or GA credentials are missing, don't send
-        if (telemetryEnabled === false || !captureURL) {
+        // Only send when explicitly opted-in (telemetryEnabled === true) and GA configured
+        if (telemetryEnabled !== true || !captureURL) {
             return;
         }
 
