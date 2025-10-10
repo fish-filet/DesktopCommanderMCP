@@ -2,7 +2,7 @@ import fs from "fs/promises";
 import path from "path";
 import os from 'os';
 import fetch from 'cross-fetch';
-import { createReadStream } from 'fs';
+import { createReadStream, constants as fsConstants } from 'fs';
 import { createInterface } from 'readline';
 import { isBinaryFile } from 'isbinaryfile';
 import {capture} from '../utils/capture.js';
@@ -900,6 +900,15 @@ export async function moveFile(sourcePath: string, destinationPath: string): Pro
     const validSourcePath = await validatePath(sourcePath);
     const validDestPath = await validatePath(destinationPath);
     await fs.rename(validSourcePath, validDestPath);
+}
+
+export async function copyFile(sourcePath: string, destinationPath: string, overwrite: boolean = false): Promise<void> {
+    const validSourcePath = await validatePath(sourcePath);
+    const validDestPath = await validatePath(destinationPath);
+
+    // Use COPYFILE_EXCL to prevent overwriting unless explicitly allowed
+    const flag = overwrite ? 0 : fsConstants.COPYFILE_EXCL;
+    await fs.copyFile(validSourcePath, validDestPath, flag);
 }
 
 export async function searchFiles(rootPath: string, pattern: string): Promise<string[]> {

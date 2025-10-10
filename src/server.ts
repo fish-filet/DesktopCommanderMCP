@@ -33,6 +33,7 @@ import {
     CreateDirectoryArgsSchema,
     ListDirectoryArgsSchema,
     MoveFileArgsSchema,
+    CopyFileArgsSchema,
     GetFileInfoArgsSchema,
     GetConfigArgsSchema,
     SetConfigValueArgsSchema,
@@ -302,6 +303,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(MoveFileArgsSchema),
+                },
+                {
+                    name: "copy_file",
+                    description: `
+                        Copy files from one location to another.
+                        
+                        Supports optional overwrite. When overwrite=false (default), the operation fails if the destination exists.
+                        Both source and destination must be within allowed directories.
+                        
+                        ${PATH_GUIDANCE}
+                        ${CMD_PREFIX_DESCRIPTION}`,
+                    inputSchema: zodToJsonSchema(CopyFileArgsSchema),
                 },
                 {
                     name: "start_search",
@@ -761,7 +774,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetPromptsArgsSchema),
                 },
-            ],
+            ].filter(t => t.name !== 'get_prompts'),
         };
     } catch (error) {
         logToStderr('error', `Error in list_tools request handler: ${error}`);
@@ -776,6 +789,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
     const {name, arguments: args} = request.params;
 
     try {
+        // Short-circuit disabled tool
+        if (name === 'get_prompts') {
+            return {
+                content: [{ type: 'text', text: 'The get_prompts tool is disabled.' }],
+                isError: true,
+            };
+        }
+
         // Prepare telemetry data - add config key for set_config_value
         const telemetryData: any = { name };
         if (name === 'set_config_value' && args && typeof args === 'object' && 'key' in args) {
@@ -916,6 +937,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
                     capture('server_request_error', {message: `Error in get_prompts handler: ${error}`});
                     result = {
                         content: [{type: "text", text: `Error: Failed to retrieve prompts`}],
+                        isError: true,
+                    };
+                }
+                break;
+            case "copy_file":
+                try {
+                    result = await handlers.handleCopyFile(args);
+                } catch (error) {
+                    capture('server_request_error', {message: `Error in copy_file handler: ${error}`});
+                    result = {
+                        content: [{type: "text", text: `Error: Failed to copy file`}],
                         isError: true,
                     };
                 }

@@ -5,6 +5,7 @@ import {
     createDirectory,
     listDirectory,
     moveFile,
+    copyFile,
     getFileInfo,
     type FileResult,
     type MultiFileResult
@@ -22,6 +23,7 @@ import {
     CreateDirectoryArgsSchema,
     ListDirectoryArgsSchema,
     MoveFileArgsSchema,
+    CopyFileArgsSchema,
     GetFileInfoArgsSchema
 } from '../tools/schemas.js';
 
@@ -229,6 +231,23 @@ export async function handleMoveFile(args: unknown): Promise<ServerResult> {
         await moveFile(parsed.source, parsed.destination);
         return {
             content: [{ type: "text", text: `Successfully moved ${parsed.source} to ${parsed.destination}` }],
+        };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createErrorResponse(errorMessage);
+    }
+}
+
+/**
+ * Handle copy_file command
+ */
+export async function handleCopyFile(args: unknown): Promise<ServerResult> {
+    try {
+        const parsed = CopyFileArgsSchema.parse(args);
+        await copyFile(parsed.source, parsed.destination, parsed.overwrite);
+        const overwriteMsg = parsed.overwrite ? ' (overwritten if existed)' : '';
+        return {
+            content: [{ type: "text", text: `Successfully copied ${parsed.source} to ${parsed.destination}${overwriteMsg}` }],
         };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);

@@ -70,6 +70,12 @@ export const MoveFileArgsSchema = z.object({
   destination: z.string(),
 });
 
+export const CopyFileArgsSchema = z.object({
+  source: z.string(),
+  destination: z.string(),
+  overwrite: z.boolean().optional().default(false),
+});
+
 export const GetFileInfoArgsSchema = z.object({
   path: z.string(),
 });
