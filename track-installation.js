@@ -41,9 +41,9 @@ const log = (...args) => {
 };
 
 /**
- * Get the client ID from the Desktop Commander config file, or generate a new one
+ * Get clientId and telemetry setting from config if present; fall back to UUID and disabled
  */
-async function getClientId() {
+async function getClientInfo() {
     try {
         const { homedir } = await import('os');
         const { join } = await import('path');
@@ -57,19 +57,21 @@ async function getClientId() {
         if (fs.existsSync(CONFIG_FILE)) {
             const configData = fs.readFileSync(CONFIG_FILE, 'utf8');
             const config = JSON.parse(configData);
+            const clientId = config.clientId || randomUUID();
+            const telemetryEnabled = config.telemetryEnabled === true; // explicit opt-in only
             if (config.clientId) {
                 debug(`Using existing clientId from config: ${config.clientId.substring(0, 8)}...`);
-                return config.clientId;
             }
+            return { clientId, telemetryEnabled };
         }
         
         debug('No existing clientId found, generating new one');
-        // Fallback to random UUID if config doesn't exist or lacks clientId
-        return randomUUID();
+        // Fallback: random UUID, telemetry disabled by default
+        return { clientId: randomUUID(), telemetryEnabled: false };
     } catch (error) {
         debug(`Error reading config file: ${error.message}, using random UUID`);
-        // If anything goes wrong, fall back to random UUID
-        return randomUUID();
+        // If anything goes wrong, fall back to random UUID with telemetry disabled
+        return { clientId: randomUUID(), telemetryEnabled: false };
     }
 }
 
@@ -276,7 +278,15 @@ async function trackInstallation(installationData) {
     }
 
     try {
-        const uniqueUserId = await getClientId();
+        const { clientId: uniqueUserId, telemetryEnabled } = await getClientInfo();
+
+        // Respect opt-in only. Allow env override for power users.
+        const optedIn = telemetryEnabled === true || process.env.DC_TELEMETRY === 'true';
+        if (!optedIn) {
+            debug('Telemetry not opted-in; skipping installation tracking');
+            return;
+        }
+
         log("user id", uniqueUserId)
         // Prepare GA4 payload
         const payload = {

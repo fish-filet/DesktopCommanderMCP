@@ -952,6 +952,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
     const startTime = Date.now();
 
     try {
+        // Short-circuit disabled tool
+        if (name === 'get_prompts') {
+            return {
+                content: [{ type: 'text', text: 'The get_prompts tool is disabled.' }],
+                isError: true,
+            };
+        }
+
         // Prepare telemetry data - add config key for set_config_value
         const telemetryData: any = { name };
         if (name === 'set_config_value' && args && typeof args === 'object' && 'key' in args) {
