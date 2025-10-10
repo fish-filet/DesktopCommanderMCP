@@ -45,6 +45,7 @@ import {
     StopSearchArgsSchema,
     ListSearchesArgsSchema,
     GetPromptsArgsSchema,
+    GetRecentToolCallsArgsSchema,
 } from './tools/schemas.js';
 import {getConfig, setConfigValue} from './tools/config.js';
 import {getUsageStats} from './tools/usage.js';
@@ -53,12 +54,27 @@ import {getPrompts} from './tools/prompts.js';
 import {trackToolCall} from './utils/trackTools.js';
 import {usageTracker} from './utils/usageTracker.js';
 import {processDockerPrompt} from './utils/dockerPrompt.js';
+import {toolHistory} from './utils/toolHistory.js';
 
 import {VERSION} from './version.js';
 import {capture, capture_call_tool} from "./utils/capture.js";
 import { logToStderr, logger } from './utils/logger.js';
 
-logToStderr('info', 'Loading server.ts');
+// Store startup messages to send after initialization
+const deferredMessages: Array<{level: string, message: string}> = [];
+function deferLog(level: string, message: string) {
+    deferredMessages.push({level, message});
+}
+
+// Function to flush deferred messages after initialization
+export function flushDeferredMessages() {
+    while (deferredMessages.length > 0) {
+        const msg = deferredMessages.shift()!;
+        logger.info(msg.message);
+    }
+}
+
+deferLog('info', 'Loading server.ts');
 
 export const server = new Server(
     {
@@ -104,8 +120,8 @@ server.setRequestHandler(InitializeRequestSchema, async (request: InitializeRequ
                 name: clientInfo.name || 'unknown',
                 version: clientInfo.version || 'unknown'
             };
-            // Send JSON-RPC notification about client connection
-            logToStderr('info', `Client connected: ${currentClient.name} v${currentClient.version}`);
+            // Defer client connection message until after initialization
+            deferLog('info', `Client connected: ${currentClient.name} v${currentClient.version}`);
         }
 
         // Return standard initialization response
@@ -131,13 +147,29 @@ server.setRequestHandler(InitializeRequestSchema, async (request: InitializeRequ
 // Export current client info for access by other modules
 export { currentClient };
 
-logToStderr('info', 'Setting up request handlers...');
+deferLog('info', 'Setting up request handlers...');
+
+/**
+ * Check if a tool should be included based on current client
+ */
+function shouldIncludeTool(toolName: string): boolean {
+    // Exclude give_feedback_to_desktop_commander for desktop-commander client
+    if (toolName === 'give_feedback_to_desktop_commander' && currentClient?.name === 'desktop-commander') {
+        return false;
+    }
+
+    // Add more conditional tool logic here as needed
+    // Example: if (toolName === 'some_tool' && currentClient?.name === 'some_client') return false;
+
+    return true;
+}
 
 server.setRequestHandler(ListToolsRequestSchema, async () => {
     try {
         logToStderr('debug', 'Generating tools list...');
-        return {
-            tools: [
+
+        // Build complete tools array
+        const allTools = [
                 // Configuration tools
                 {
                     name: "get_config",
@@ -155,6 +187,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         - systemInfo (operating system and environment details)
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetConfigArgsSchema),
+                    annotations: {
+                        title: "Get Configuration",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "set_config_value",
@@ -177,6 +213,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(SetConfigValueArgsSchema),
+                    annotations: {
+                        title: "Set Configuration Value",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: false,
+                    },
                 },
 
                 // Filesystem tools
@@ -216,6 +258,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ReadFileArgsSchema),
+                    annotations: {
+                        title: "Read File or URL",
+                        readOnlyHint: true,
+                        openWorldHint: true,
+                    },
                 },
                 {
                     name: "read_multiple_files",
@@ -232,6 +279,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ReadMultipleFilesArgsSchema),
+                    annotations: {
+                        title: "Read Multiple Files",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "write_file",
@@ -265,6 +316,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(WriteFileArgsSchema),
+                    annotations: {
+                        title: "Write File",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: false,
+                    },
                 },
                 {
                     name: "create_directory",
@@ -285,11 +342,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         Use this instead of 'execute_command' with ls/dir commands.
                         Results distinguish between files and directories with [FILE] and [DIR] prefixes.
+                        
+                        Supports recursive listing with the 'depth' parameter (default: 2):
+                        - depth=1: Only direct contents of the directory
+                        - depth=2: Contents plus one level of subdirectories
+                        - depth=3+: Multiple levels deep
+                        
+                        CONTEXT OVERFLOW PROTECTION:
+                        - Top-level directory shows ALL items
+                        - Nested directories are limited to 100 items maximum per directory
+                        - When a nested directory has more than 100 items, you'll see a warning like:
+                          [WARNING] node_modules: 500 items hidden (showing first 100 of 600 total)
+                        - This prevents overwhelming the context with large directories like node_modules
+                        
+                        Results show full relative paths from the root directory being listed.
+                        Example output with depth=2:
+                        [DIR] src
+                        [FILE] src/index.ts
+                        [DIR] src/tools
+                        [FILE] src/tools/filesystem.ts
+                        
+                        If a directory cannot be accessed, it will show [DENIED] instead.
                         Only works within allowed directories.
                         
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ListDirectoryArgsSchema),
+                    annotations: {
+                        title: "List Directory Contents",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "move_file",
@@ -302,6 +384,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(MoveFileArgsSchema),
+                    annotations: {
+                        title: "Move/Rename File",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: false,
+                    },
                 },
                 {
                     name: "start_search",
@@ -411,6 +499,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetMoreSearchResultsArgsSchema),
+                    annotations: {
+                        title: "Get Search Results",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "stop_search", 
@@ -438,6 +530,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ListSearchesArgsSchema),
+                    annotations: {
+                        title: "List Active Searches",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "get_file_info",
@@ -457,6 +553,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetFileInfoArgsSchema),
+                    annotations: {
+                        title: "Get File Information",
+                        readOnlyHint: true,
+                    },
                 },
                 // Note: list_allowed_directories removed - use get_config to check allowedDirectories
 
@@ -497,6 +597,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(EditBlockArgsSchema),
+                    annotations: {
+                        title: "Edit Text Block",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: false,
+                    },
                 },
                 
                 // Terminal tools
@@ -554,6 +660,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${PATH_GUIDANCE}
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(StartProcessArgsSchema),
+                    annotations: {
+                        title: "Start Terminal Process",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: true,
+                    },
                 },
                 {
                     name: "read_process_output",
@@ -581,6 +693,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ReadProcessOutputArgsSchema),
+                    annotations: {
+                        title: "Read Process Output",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "interact_with_process", 
@@ -633,6 +749,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(InteractWithProcessArgsSchema),
+                    annotations: {
+                        title: "Send Input to Process",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: true,
+                    },
                 },
                 {
                     name: "force_terminate",
@@ -641,6 +763,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ForceTerminateArgsSchema),
+                    annotations: {
+                        title: "Force Terminate Process",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: false,
+                    },
                 },
                 {
                     name: "list_sessions",
@@ -659,6 +787,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ListSessionsArgsSchema),
+                    annotations: {
+                        title: "List Terminal Sessions",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "list_processes",
@@ -669,6 +801,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(ListProcessesArgsSchema),
+                    annotations: {
+                        title: "List Running Processes",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "kill_process",
@@ -679,6 +815,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(KillProcessArgsSchema),
+                    annotations: {
+                        title: "Kill Process",
+                        readOnlyHint: false,
+                        destructiveHint: true,
+                        openWorldHint: false,
+                    },
                 },
                 {
                     name: "get_usage_stats",
@@ -689,6 +831,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetUsageStatsArgsSchema),
+                    annotations: {
+                        title: "Get Usage Statistics",
+                        readOnlyHint: true,
+                    },
+                },
+                {
+                    name: "get_recent_tool_calls",
+                    description: `
+                        Get recent tool call history with their arguments and outputs.
+                        Returns chronological list of tool calls made during this session.
+                        
+                        Useful for:
+                        - Onboarding new chats about work already done
+                        - Recovering context after chat history loss
+                        - Debugging tool call sequences
+                        
+                        Note: Does not track its own calls or other meta/query tools.
+                        History kept in memory (last 1000 calls, lost on restart).
+                        
+                        ${CMD_PREFIX_DESCRIPTION}`,
+                    inputSchema: zodToJsonSchema(GetRecentToolCallsArgsSchema),
+                    annotations: {
+                        title: "Get Recent Tool Calls",
+                        readOnlyHint: true,
+                    },
                 },
                 {
                     name: "give_feedback_to_desktop_commander",
@@ -761,7 +928,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetPromptsArgsSchema),
                 },
-            ],
+            ];
+
+        // Filter tools based on current client
+        const filteredTools = allTools.filter(tool => shouldIncludeTool(tool.name));
+
+        logToStderr('debug', `Returning ${filteredTools.length} tools (filtered from ${allTools.length} total) for client: ${currentClient?.name || 'unknown'}`);
+
+        return {
+            tools: filteredTools,
         };
     } catch (error) {
         logToStderr('error', `Error in list_tools request handler: ${error}`);
@@ -774,6 +949,7 @@ import {ServerResult} from './types.js';
 
 server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest): Promise<ServerResult> => {
     const {name, arguments: args} = request.params;
+    const startTime = Date.now();
 
     try {
         // Prepare telemetry data - add config key for set_config_value
@@ -921,6 +1097,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
                 }
                 break;
 
+            case "get_recent_tool_calls":
+                try {
+                    result = await handlers.handleGetRecentToolCalls(args);
+                } catch (error) {
+                    capture('server_request_error', {message: `Error in get_recent_tool_calls handler: ${error}`});
+                    result = {
+                        content: [{type: "text", text: `Error: Failed to get tool call history`}],
+                        isError: true,
+                    };
+                }
+                break;
+
             case "give_feedback_to_desktop_commander":
                 try {
                     result = await giveFeedbackToDesktopCommander(args);
@@ -1020,6 +1208,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
                     content: [{type: "text", text: `Error: Unknown tool: ${name}`}],
                     isError: true,
                 };
+        }
+
+        // Add tool call to history (exclude only get_recent_tool_calls to prevent recursion)
+        const duration = Date.now() - startTime;
+        const EXCLUDED_TOOLS = [
+            'get_recent_tool_calls'
+        ];
+        
+        if (!EXCLUDED_TOOLS.includes(name)) {
+            toolHistory.addCall(name, args, result, duration);
         }
 
         // Track success or failure based on result

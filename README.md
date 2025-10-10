@@ -10,10 +10,7 @@
 [![Discord](https://img.shields.io/badge/Join%20Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/kQ27sNnZr7)
 
 
-Work with code and text, run processes, and automate tasks, going far beyond other AI editors - without API token costs.
-
-
-![Desktop Commander MCP](https://raw.githubusercontent.com/wonderwhy-er/ClaudeComputerCommander/main/docs/vertical_video_mobile.mp4)
+Work with code and text, run processes, and automate tasks, going far beyond other AI editors - while using host client subscriptions instead of API token costs.
 
 <a href="https://glama.ai/mcp/servers/zempur9oh4">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/zempur9oh4/badge" alt="Desktop Commander MCP" />
@@ -86,6 +83,11 @@ For debugging mode (allows Node.js inspector connection):
 ```
 npx @wonderwhy-er/desktop-commander@latest setup --debug
 ```
+
+**Command line options during setup:**
+- `--debug`: Enable debugging mode for Node.js inspector
+- `--no-onboarding`: Disable onboarding prompts for new users
+
 Restart Claude if running.
 
 **✅ Auto-Updates:** Yes - automatically updates when you restart Claude  
@@ -422,7 +424,7 @@ The server provides a comprehensive set of tools organized into several categori
 | | `read_multiple_files` | Read multiple files simultaneously |
 | | `write_file` | Write file contents with options for rewrite or append mode (uses configurable line limits) |
 | | `create_directory` | Create a new directory or ensure it exists |
-| | `list_directory` | Get detailed listing of files and directories |
+| | `list_directory` | Get detailed recursive listing of files and directories (supports depth parameter, default depth=2) |
 | | `move_file` | Move or rename files and directories |
 | | `start_search` | Start streaming search for files by name or content patterns (unified ripgrep-based search) |
 | | `get_more_search_results` | Get paginated results from active search with offset support |
@@ -431,6 +433,7 @@ The server provides a comprehensive set of tools organized into several categori
 | | `get_file_info` | Retrieve detailed metadata about a file or directory |
 | **Text Editing** | `edit_block` | Apply targeted text replacements with enhanced prompting for smaller edits (includes character-level diff feedback) |
 | **Analytics** | `get_usage_stats` | Get usage statistics for your own insight |
+| | `get_recent_tool_calls` | Get recent tool call history with arguments and outputs for debugging and context recovery |
 | | `give_feedback_to_desktop_commander` | Open feedback form in browser to provide feedback to Desktop Commander Team |
 
 ### Quick Examples
@@ -651,6 +654,44 @@ set_config_value({ "key": "fileWriteLineLimit", "value": 25 })
 3. **Use specific paths**: Instead of using broad paths like `/`, specify exact directories you want to access.
 
 4. **Always verify configuration after changes**: Use `get_config({})` to confirm your changes were applied correctly.
+
+## Command Line Options
+
+Desktop Commander supports several command line options for customizing behavior:
+
+### Disable Onboarding
+
+By default, Desktop Commander shows helpful onboarding prompts to new users (those with fewer than 10 tool calls). You can disable this behavior:
+
+```bash
+# Disable onboarding for this session
+node dist/index.js --no-onboarding
+
+# Or if using npm scripts
+npm run start:no-onboarding
+
+# For npx installations, modify your claude_desktop_config.json:
+{
+  "mcpServers": {
+    "desktop-commander": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@wonderwhy-er/desktop-commander@latest",
+        "--no-onboarding"
+      ]
+    }
+  }
+}
+```
+
+**When onboarding is automatically disabled:**
+- When the MCP client name is set to "desktop-commander"
+- When using the `--no-onboarding` flag
+- After users have used onboarding prompts or made 10+ tool calls
+
+**Debug information:**
+The server will log when onboarding is disabled: `"Onboarding disabled via --no-onboarding flag"`
 
 ## Using Different Shells
 
@@ -911,7 +952,7 @@ External telemetry (sent to analytics services) is enabled by default but can be
 
 **Note:** This only disables external telemetry. Local usage analytics remain active for tool functionality but is not share externally
 
-For complete details about data collection, please see our [Privacy Policy](PRIVACY.md).
+For complete details about data collection, please see our [Privacy Policy](https://legal.desktopcommander.app/privacy_desktop_commander_mcp).
 
 ## Verifications
 [![Verified on MseeP](https://mseep.ai/badge.svg)](https://mseep.ai/app/25ff7a06-58bc-40b8-bd79-ebb715140f1a)
