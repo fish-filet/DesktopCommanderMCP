@@ -32,6 +32,7 @@ import {
     WriteFileArgsSchema,
     CreateDirectoryArgsSchema,
     ListDirectoryArgsSchema,
+    ListDirectoryTreeArgsSchema,
     MoveFileArgsSchema,
     CopyFileArgsSchema,
     GetFileInfoArgsSchema,
@@ -369,6 +370,35 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     inputSchema: zodToJsonSchema(ListDirectoryArgsSchema),
                     annotations: {
                         title: "List Directory Contents",
+                        readOnlyHint: true,
+                    },
+                },
+                {
+                    name: "list_directory_tree",
+                    description: `
+                        Show an ASCII tree of a directory recursively.
+                        
+                        Displays directories and files with tree connectors (├──, └──, │),
+                        marks inaccessible folders as [DENIED], and limits very large
+                        nested directories to 100 entries with a warning to avoid
+                        overwhelming context.
+                        
+                        Parameters:
+                        - path: Directory to list
+                        - depth: Recursion depth (default: 3)
+                        
+                        Example output:
+                        project/
+                        ├── src/
+                        │   ├── index.ts
+                        │   └── tools/
+                        └── package.json
+                        
+                        ${PATH_GUIDANCE}
+                        ${CMD_PREFIX_DESCRIPTION}`,
+                    inputSchema: zodToJsonSchema(ListDirectoryTreeArgsSchema),
+                    annotations: {
+                        title: "List Directory Tree",
                         readOnlyHint: true,
                     },
                 },
@@ -1156,6 +1186,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
 
             case "list_directory":
                 result = await handlers.handleListDirectory(args);
+                break;
+
+            case "list_directory_tree":
+                result = await handlers.handleListDirectoryTree(args);
                 break;
 
             case "move_file":

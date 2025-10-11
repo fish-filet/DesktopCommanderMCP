@@ -66,6 +66,12 @@ export const ListDirectoryArgsSchema = z.object({
   depth: z.number().optional().default(2),
 });
 
+// Tree-style directory listing
+export const ListDirectoryTreeArgsSchema = z.object({
+  path: z.string(),
+  depth: z.number().optional().default(3),
+});
+
 export const MoveFileArgsSchema = z.object({
   source: z.string(),
   destination: z.string(),

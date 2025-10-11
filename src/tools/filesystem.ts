@@ -951,6 +951,85 @@ export async function listDirectory(dirPath: string, depth: number = 2): Promise
     return results;
 }
 
+/**
+ * Produce an ASCII tree view of a directory up to a given depth.
+ * Includes directories and files, limits large nested directories for context safety,
+ * and marks permission issues with [DENIED].
+ */
+export async function listDirectoryTree(dirPath: string, depth: number = 3): Promise<string> {
+    const validPath = await validatePath(dirPath);
+
+    const MAX_NESTED_ITEMS = 100; // Keep parity with listDirectory
+
+    type Entry = { name: string; isDir: boolean };
+
+    async function safeReadDir(p: string): Promise<Entry[] | 'DENIED'> {
+        try {
+            const entries = await fs.readdir(p, { withFileTypes: true });
+            const mapped: Entry[] = entries.map(e => ({ name: e.name, isDir: e.isDirectory() }));
+            // Sort: directories first, then files; alphabetical within groups
+            mapped.sort((a, b) => {
+                if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
+                return a.name.localeCompare(b.name);
+            });
+            return mapped;
+        } catch {
+            return 'DENIED';
+        }
+    }
+
+    async function renderTree(currentPath: string, currentDepth: number, prefix: string = ''): Promise<string[]> {
+        if (currentDepth <= 0) return [];
+
+        const entries = await safeReadDir(currentPath);
+        if (entries === 'DENIED') {
+            return [prefix + '[DENIED]'];
+        }
+
+        const total = entries.length;
+        let shown = entries;
+        let filteredCount = 0;
+        if (currentDepth < depth && total > MAX_NESTED_ITEMS) {
+            shown = entries.slice(0, MAX_NESTED_ITEMS);
+            filteredCount = total - MAX_NESTED_ITEMS;
+        }
+
+        const lines: string[] = [];
+        for (let i = 0; i < shown.length; i++) {
+            const entry = shown[i];
+            const isLast = i === shown.length - 1;
+            const connector = isLast ? '└── ' : '├── ';
+            lines.push(prefix + connector + entry.name + (entry.isDir ? '/' : ''));
+
+            if (entry.isDir && currentDepth > 1) {
+                const nextPrefix = prefix + (isLast ? '    ' : '│   ');
+                const childPath = path.join(currentPath, entry.name);
+                try {
+                    await validatePath(childPath);
+                    const childLines = await renderTree(childPath, currentDepth - 1, nextPrefix);
+                    lines.push(...childLines);
+                } catch {
+                    // Validation failed; show denied marker
+                    lines.push(nextPrefix + '[DENIED]');
+                }
+            }
+        }
+
+        if (filteredCount > 0) {
+            const warnConnector = '└── ';
+            lines.push(prefix + warnConnector + `[WARNING] ${filteredCount} items hidden (showing first ${MAX_NESTED_ITEMS} of ${total} total)`);
+        }
+
+        return lines;
+    }
+
+    const rootName = path.basename(validPath) || validPath;
+    const lines: string[] = [rootName + '/'];
+    const tree = await renderTree(validPath, depth, '');
+    lines.push(...tree);
+    return lines.join('\n');
+}
+
 export async function moveFile(sourcePath: string, destinationPath: string): Promise<void> {
     const validSourcePath = await validatePath(sourcePath);
     const validDestPath = await validatePath(destinationPath);

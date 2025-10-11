@@ -4,6 +4,7 @@ import {
     writeFile,
     createDirectory,
     listDirectory,
+    listDirectoryTree,
     moveFile,
     copyFileOrDirectory,
     getFileInfo,
@@ -22,6 +23,7 @@ import {
     WriteFileArgsSchema,
     CreateDirectoryArgsSchema,
     ListDirectoryArgsSchema,
+    ListDirectoryTreeArgsSchema,
     MoveFileArgsSchema,
     CopyFileArgsSchema,
     GetFileInfoArgsSchema
@@ -220,6 +222,22 @@ export async function handleListDirectory(args: unknown): Promise<ServerResult> 
 
         return {
             content: [{ type: "text", text: resultText }],
+        };
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return createErrorResponse(errorMessage);
+    }
+}
+
+/**
+ * Handle list_directory_tree command
+ */
+export async function handleListDirectoryTree(args: unknown): Promise<ServerResult> {
+    try {
+        const parsed = ListDirectoryTreeArgsSchema.parse(args);
+        const output = await listDirectoryTree(parsed.path, parsed.depth);
+        return {
+            content: [{ type: "text", text: output }],
         };
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
