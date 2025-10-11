@@ -63,6 +63,7 @@ export const CreateDirectoryArgsSchema = z.object({
 
 export const ListDirectoryArgsSchema = z.object({
   path: z.string(),
+  depth: z.number().optional().default(2),
 });
 
 export const MoveFileArgsSchema = z.object({
@@ -133,4 +134,11 @@ export const GetPromptsArgsSchema = z.object({
   action: z.enum(['list_categories', 'list_prompts', 'get_prompt']),
   category: z.string().optional(),
   promptId: z.string().optional(),
+});
+
+// Tool history schema
+export const GetRecentToolCallsArgsSchema = z.object({
+  maxResults: z.number().min(1).max(1000).optional().default(50),
+  toolName: z.string().optional(),
+  since: z.string().datetime().optional(),
 });

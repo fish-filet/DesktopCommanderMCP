@@ -13,19 +13,23 @@ export async function getConfig() {
     
     // Add system information and current client to the config response
     const systemInfo = getSystemInfo();
+    
+    // Get memory usage
+    const memoryUsage = process.memoryUsage();
+    const memory = {
+      rss: `${(memoryUsage.rss / 1024 / 1024).toFixed(2)} MB`,
+      heapTotal: `${(memoryUsage.heapTotal / 1024 / 1024).toFixed(2)} MB`,
+      heapUsed: `${(memoryUsage.heapUsed / 1024 / 1024).toFixed(2)} MB`,
+      external: `${(memoryUsage.external / 1024 / 1024).toFixed(2)} MB`,
+      arrayBuffers: `${(memoryUsage.arrayBuffers / 1024 / 1024).toFixed(2)} MB`
+    };
+    
     const configWithSystemInfo = {
       ...config,
       currentClient,
       systemInfo: {
-        platform: systemInfo.platform,
-        platformName: systemInfo.platformName,
-        defaultShell: systemInfo.defaultShell,
-        pathSeparator: systemInfo.pathSeparator,
-        isWindows: systemInfo.isWindows,
-        isMacOS: systemInfo.isMacOS,
-        isLinux: systemInfo.isLinux,
-        docker: systemInfo.docker,
-        examplePaths: systemInfo.examplePaths
+        ...systemInfo,
+        memory
       }
     };
     
