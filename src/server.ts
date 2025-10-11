@@ -153,11 +153,6 @@ deferLog('info', 'Setting up request handlers...');
  * Check if a tool should be included based on current client
  */
 function shouldIncludeTool(toolName: string): boolean {
-    // Exclude give_feedback_to_desktop_commander for desktop-commander client
-    if (toolName === 'give_feedback_to_desktop_commander' && currentClient?.name === 'desktop-commander') {
-        return false;
-    }
-
     // Add more conditional tool logic here as needed
     // Example: if (toolName === 'some_tool' && currentClient?.name === 'some_client') return false;
 

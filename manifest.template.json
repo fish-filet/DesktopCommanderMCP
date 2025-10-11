@@ -127,8 +127,8 @@
       "description": "Get recent tool call history with their arguments and outputs. Returns chronological list of tool calls made during this session for debugging, context recovery, and onboarding new chats."
     },
     {
-      "name": "give_feedback_to_desktop_commander",
-      "description": "Open feedback form in browser to provide feedback about Desktop Commander."
+      "name": "list_directory_tree",
+      "description": "Show an ASCII tree of a directory recursively with depth control."
     },
     {
       "name": "get_prompts",

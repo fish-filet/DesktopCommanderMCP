@@ -425,6 +425,7 @@ The server provides a comprehensive set of tools organized into several categori
 | | `write_file` | Write file contents with options for rewrite or append mode (uses configurable line limits) |
 | | `create_directory` | Create a new directory or ensure it exists |
 | | `list_directory` | Get detailed recursive listing of files and directories (supports depth parameter, default depth=2) |
+| | `list_directory_tree` | Show an ASCII tree of a directory recursively (supports depth parameter, default depth=3) |
 | | `move_file` | Move or rename files and directories |
 | | `copy_file_or_directory` | Copy a file or directory (recursive) with optional overwrite |
 | | `start_search` | Start streaming search for files by name or content patterns (unified ripgrep-based search) |
