@@ -100,14 +100,6 @@ export const InteractWithProcessArgsSchema = z.object({
 export const GetUsageStatsArgsSchema = z.object({});
 
 // Feedback tool schema - no pre-filled parameters, all user input
-export const GiveFeedbackArgsSchema = z.object({
-  // No parameters needed - form will be filled manually by user
-  // Only auto-filled hidden fields remain:
-  // - tool_call_count (auto)
-  // - days_using (auto) 
-  // - platform (auto)
-  // - client_id (auto)
-});
 
 // Search schemas (renamed for natural language)
 export const StartSearchArgsSchema = z.object({

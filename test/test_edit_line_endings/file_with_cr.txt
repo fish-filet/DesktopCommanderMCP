@@ -1,0 +1,1 @@
+First line with CRSecond line with CRTarget line to replaceFourth line with CRFifth line with CR

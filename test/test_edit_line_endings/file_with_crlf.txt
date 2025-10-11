@@ -1,0 +1,5 @@
+First line with CRLF
+Second line with CRLF
+Target line to replace
+Fourth line with CRLF
+Fifth line with CRLF

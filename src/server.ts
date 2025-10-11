@@ -40,7 +40,6 @@ import {
     ListProcessesArgsSchema,
     EditBlockArgsSchema,
     GetUsageStatsArgsSchema,
-    GiveFeedbackArgsSchema,
     StartSearchArgsSchema,
     GetMoreSearchResultsArgsSchema,
     StopSearchArgsSchema,
@@ -49,7 +48,6 @@ import {
 } from './tools/schemas.js';
 import {getConfig, setConfigValue} from './tools/config.js';
 import {getUsageStats} from './tools/usage.js';
-import {giveFeedbackToDesktopCommander} from './tools/feedback.js';
 import {getPrompts} from './tools/prompts.js';
 import {trackToolCall} from './utils/trackTools.js';
 import {usageTracker} from './utils/usageTracker.js';
@@ -305,11 +303,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                     inputSchema: zodToJsonSchema(MoveFileArgsSchema),
                 },
                 {
-                    name: "copy_file",
+                    name: "copy_file_or_directory",
                     description: `
-                        Copy files from one location to another.
+                        Copy a file or directory (recursive) to a new location.
                         
                         Supports optional overwrite. When overwrite=false (default), the operation fails if the destination exists.
+                        When copying directories, contents are copied recursively. When overwrite=true, existing files are replaced.
                         Both source and destination must be within allowed directories.
                         
                         ${PATH_GUIDANCE}
@@ -703,43 +702,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
                         ${CMD_PREFIX_DESCRIPTION}`,
                     inputSchema: zodToJsonSchema(GetUsageStatsArgsSchema),
                 },
-                {
-                    name: "give_feedback_to_desktop_commander",
-                    description: `
-                        Open feedback form in browser to provide feedback about Desktop Commander.
-                        
-                        IMPORTANT: This tool simply opens the feedback form - no pre-filling available.
-                        The user will fill out the form manually in their browser.
-                        
-                        WORKFLOW:
-                        1. When user agrees to give feedback, just call this tool immediately
-                        2. No need to ask questions or collect information
-                        3. Tool opens form with only usage statistics pre-filled automatically:
-                           - tool_call_count: Number of commands they've made
-                           - days_using: How many days they've used Desktop Commander
-                           - platform: Their operating system (Mac/Windows/Linux)
-                           - client_id: Analytics identifier
-                        
-                        All survey questions will be answered directly in the form:
-                        - Job title and technical comfort level
-                        - Company URL for industry context
-                        - Other AI tools they use
-                        - Desktop Commander's biggest advantage
-                        - How they typically use it
-                        - Recommendation likelihood (0-10)
-                        - User study participation interest
-                        - Email and any additional feedback
-                        
-                        EXAMPLE INTERACTION:
-                        User: "sure, I'll give feedback"
-                        Claude: "Perfect! Let me open the feedback form for you."
-                        [calls tool immediately]
-                        
-                        No parameters are needed - just call the tool to open the form.
-                        
-                        ${CMD_PREFIX_DESCRIPTION}`,
-                    inputSchema: zodToJsonSchema(GiveFeedbackArgsSchema),
-                },
+                
                 {
                     name: "get_prompts",
                     description: `
@@ -941,29 +904,19 @@ server.setRequestHandler(CallToolRequestSchema, async (request: CallToolRequest)
                     };
                 }
                 break;
-            case "copy_file":
+            case "copy_file_or_directory":
                 try {
-                    result = await handlers.handleCopyFile(args);
+                    result = await handlers.handleCopyFileOrDirectory(args);
                 } catch (error) {
-                    capture('server_request_error', {message: `Error in copy_file handler: ${error}`});
+                    capture('server_request_error', {message: `Error in copy_file_or_directory handler: ${error}`});
                     result = {
-                        content: [{type: "text", text: `Error: Failed to copy file`}],
+                        content: [{type: "text", text: `Error: Failed to copy file or directory`}],
                         isError: true,
                     };
                 }
                 break;
 
-            case "give_feedback_to_desktop_commander":
-                try {
-                    result = await giveFeedbackToDesktopCommander(args);
-                } catch (error) {
-                    capture('server_request_error', {message: `Error in give_feedback_to_desktop_commander handler: ${error}`});
-                    result = {
-                        content: [{type: "text", text: `Error: Failed to open feedback form`}],
-                        isError: true,
-                    };
-                }
-                break;
+            
 
             // Terminal tools
             case "start_process":

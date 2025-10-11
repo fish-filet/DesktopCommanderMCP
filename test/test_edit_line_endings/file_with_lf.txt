@@ -1,0 +1,5 @@
+First line with LF
+Second line with LF
+Target line to replace
+Fourth line with LF
+Fifth line with LF

@@ -5,7 +5,7 @@ import {
     createDirectory,
     listDirectory,
     moveFile,
-    copyFile,
+    copyFileOrDirectory,
     getFileInfo,
     type FileResult,
     type MultiFileResult
@@ -239,12 +239,12 @@ export async function handleMoveFile(args: unknown): Promise<ServerResult> {
 }
 
 /**
- * Handle copy_file command
+ * Handle copy_file_or_directory command
  */
-export async function handleCopyFile(args: unknown): Promise<ServerResult> {
+export async function handleCopyFileOrDirectory(args: unknown): Promise<ServerResult> {
     try {
         const parsed = CopyFileArgsSchema.parse(args);
-        await copyFile(parsed.source, parsed.destination, parsed.overwrite);
+        await copyFileOrDirectory(parsed.source, parsed.destination, parsed.overwrite);
         const overwriteMsg = parsed.overwrite ? ' (overwritten if existed)' : '';
         return {
             content: [{ type: "text", text: `Successfully copied ${parsed.source} to ${parsed.destination}${overwriteMsg}` }],

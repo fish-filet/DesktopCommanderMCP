@@ -902,13 +902,24 @@ export async function moveFile(sourcePath: string, destinationPath: string): Pro
     await fs.rename(validSourcePath, validDestPath);
 }
 
-export async function copyFile(sourcePath: string, destinationPath: string, overwrite: boolean = false): Promise<void> {
+export async function copyFileOrDirectory(sourcePath: string, destinationPath: string, overwrite: boolean = false): Promise<void> {
     const validSourcePath = await validatePath(sourcePath);
     const validDestPath = await validatePath(destinationPath);
 
-    // Use COPYFILE_EXCL to prevent overwriting unless explicitly allowed
-    const flag = overwrite ? 0 : fsConstants.COPYFILE_EXCL;
-    await fs.copyFile(validSourcePath, validDestPath, flag);
+    const srcStat = await fs.stat(validSourcePath);
+    if (srcStat.isDirectory()) {
+        // Recursively copy directories. Honor overwrite semantics.
+        // Node >=18: fs.cp supports recursive and overwrite flags
+        await (fs as any).cp(validSourcePath, validDestPath, {
+            recursive: true,
+            force: overwrite,
+            errorOnExist: !overwrite,
+        });
+    } else {
+        // Copy single file
+        const flag = overwrite ? 0 : fsConstants.COPYFILE_EXCL;
+        await fs.copyFile(validSourcePath, validDestPath, flag);
+    }
 }
 
 export async function searchFiles(rootPath: string, pattern: string): Promise<string[]> {

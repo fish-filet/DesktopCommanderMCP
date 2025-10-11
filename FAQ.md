@@ -319,8 +319,7 @@ Desktop Commander has three separate data collection systems:
 - **Can be disabled** by asking: **"Disable telemetry"**
 
 **3. Feedback System (User Controlled):**
-- Use the `give_feedback_to_desktop_commander` tool to provide feedback about Desktop Commander
-- Opens a browser-based feedback form to send suggestions and feedback to the development team
+You can share feedback via our community channels (e.g., Discord) or issue tracker.
 - Pre-fills basic usage statistics (tool call count, days using, platform) for context
 - **You can edit or remove any pre-filled information** before submitting
 - **Completely optional** - you choose when and if to participate

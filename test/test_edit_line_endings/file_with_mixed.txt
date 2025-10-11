@@ -1,0 +1,4 @@
+First line with LF
+Second line with CRLF
+Target line to replace
+Fourth line with CRFifth line with LF

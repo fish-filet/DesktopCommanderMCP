@@ -1,0 +1,13 @@
+Header section
+This is a target line.
+End of header section
+
+Main content section
+This is a target line.
+More content here
+This is a target line.
+End of main content
+
+Footer section
+This is a target line.
+End of footer

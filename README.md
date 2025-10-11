@@ -424,6 +424,7 @@ The server provides a comprehensive set of tools organized into several categori
 | | `create_directory` | Create a new directory or ensure it exists |
 | | `list_directory` | Get detailed listing of files and directories |
 | | `move_file` | Move or rename files and directories |
+| | `copy_file_or_directory` | Copy a file or directory (recursive) with optional overwrite |
 | | `start_search` | Start streaming search for files by name or content patterns (unified ripgrep-based search) |
 | | `get_more_search_results` | Get paginated results from active search with offset support |
 | | `stop_search` | Stop an active search gracefully |
@@ -431,7 +432,6 @@ The server provides a comprehensive set of tools organized into several categori
 | | `get_file_info` | Retrieve detailed metadata about a file or directory |
 | **Text Editing** | `edit_block` | Apply targeted text replacements with enhanced prompting for smaller edits (includes character-level diff feedback) |
 | **Analytics** | `get_usage_stats` | Get usage statistics for your own insight |
-| | `give_feedback_to_desktop_commander` | Open feedback form in browser to provide feedback to Desktop Commander Team |
 
 ### Quick Examples
 
@@ -898,8 +898,7 @@ Desktop Commander collects limited anonymous telemetry data to help improve the 
 - **This data is NOT sent anywhere** - it remains on your computer for your personal insights
 
 ### Feedback System
-- Use the `give_feedback_to_desktop_commander` tool to provide feedback about Desktop Commander
-- Opens a browser-based feedback form to send suggestions and feedback to the development team
+
 - Only basic usage statistics (tool call count, days using, platform) are pre-filled to provide context but you can remove them
 
 ### External Telemetry Opt-Out
